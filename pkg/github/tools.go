@@ -167,6 +167,7 @@ func DefaultToolsetGroup(readOnly bool, getClient GetClientFn, getGQLClient GetG
 			toolsets.NewServerTool(GetMe(getClient, t)),
 			toolsets.NewServerTool(GetTeams(getClient, getGQLClient, t)),
 			toolsets.NewServerTool(GetTeamMembers(getGQLClient, t)),
+			toolsets.NewServerTool(GetHelp(getClient, t)),
 		)
 
 	gists := toolsets.NewToolset("gists", "GitHub Gist related tools").

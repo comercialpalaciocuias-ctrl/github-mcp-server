@@ -497,3 +497,91 @@ func Test_GetTeamMembers(t *testing.T) {
 		})
 	}
 }
+
+func Test_GetHelp(t *testing.T) {
+	t.Parallel()
+
+	tool, _ := GetHelp(nil, translations.NullTranslationHelper)
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	// Verify basic properties
+	assert.Equal(t, "get_help", tool.Name)
+	assert.True(t, *tool.Annotations.ReadOnlyHint, "get_help tool should be read-only")
+
+	tests := []struct {
+		name               string
+		stubbedGetClientFn GetClientFn
+		requestArgs        map[string]any
+		expectToolError    bool
+		expectedToolErrMsg string
+		expectedResult     func(t *testing.T, helpInfo HelpInfo)
+	}{
+		{
+			name:               "get all toolsets help",
+			stubbedGetClientFn: nil, // Not needed for this tool
+			requestArgs:        map[string]any{},
+			expectToolError:    false,
+			expectedResult: func(t *testing.T, helpInfo HelpInfo) {
+				assert.NotEmpty(t, helpInfo.ServerDescription)
+				assert.Contains(t, helpInfo.ServerDescription, "GitHub MCP Server")
+				assert.GreaterOrEqual(t, len(helpInfo.Toolsets), 10) // Should have multiple toolsets
+				assert.NotEmpty(t, helpInfo.Usage)
+				
+				// Check that we have the expected toolsets
+				toolsetNames := make([]string, len(helpInfo.Toolsets))
+				for i, ts := range helpInfo.Toolsets {
+					toolsetNames[i] = ts.Name
+				}
+				assert.Contains(t, toolsetNames, "context")
+				assert.Contains(t, toolsetNames, "repos")
+				assert.Contains(t, toolsetNames, "issues")
+			},
+		},
+		{
+			name:               "get specific toolset help",
+			stubbedGetClientFn: nil,
+			requestArgs:        map[string]any{"toolset": "context"},
+			expectToolError:    false,
+			expectedResult: func(t *testing.T, helpInfo HelpInfo) {
+				assert.NotEmpty(t, helpInfo.ServerDescription)
+				assert.Len(t, helpInfo.Toolsets, 1)
+				assert.Equal(t, "context", helpInfo.Toolsets[0].Name)
+				assert.Equal(t, "User Context", helpInfo.Toolsets[0].Category)
+			},
+		},
+		{
+			name:               "get help for non-existent toolset",
+			stubbedGetClientFn: nil,
+			requestArgs:        map[string]any{"toolset": "nonexistent"},
+			expectToolError:    true,
+			expectedToolErrMsg: "Toolset 'nonexistent' not found",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, handler := GetHelp(tc.stubbedGetClientFn, translations.NullTranslationHelper)
+
+			request := createMCPRequest(tc.requestArgs)
+			result, err := handler(context.Background(), request)
+			require.NoError(t, err)
+			textContent := getTextResult(t, result)
+
+			if tc.expectToolError {
+				assert.True(t, result.IsError, "expected tool call result to be an error")
+				assert.Contains(t, textContent.Text, tc.expectedToolErrMsg)
+				return
+			}
+
+			assert.False(t, result.IsError, "expected tool call result not to be an error")
+
+			var helpInfo HelpInfo
+			err = json.Unmarshal([]byte(textContent.Text), &helpInfo)
+			require.NoError(t, err)
+
+			if tc.expectedResult != nil {
+				tc.expectedResult(t, helpInfo)
+			}
+		})
+	}
+}
