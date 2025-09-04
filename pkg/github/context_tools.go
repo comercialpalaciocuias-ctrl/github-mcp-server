@@ -249,3 +249,132 @@ func GetTeamMembers(getGQLClient GetGQLClientFn, t translations.TranslationHelpe
 			return MarshalledTextResult(members), nil
 		}
 }
+
+// ToolsetInfo contains information about an available toolset
+type ToolsetInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Category    string `json:"category"`
+}
+
+// HelpInfo contains help information about the server
+type HelpInfo struct {
+	ServerDescription string        `json:"server_description"`
+	Toolsets          []ToolsetInfo `json:"toolsets"`
+	Usage             string        `json:"usage"`
+}
+
+// GetHelp creates a tool to provide help information about available toolsets and functionality
+func GetHelp(getClient GetClientFn, t translations.TranslationHelperFunc) (mcp.Tool, server.ToolHandlerFunc) {
+	tool := mcp.NewTool("get_help",
+		mcp.WithDescription(t("TOOL_GET_HELP_DESCRIPTION", "Get help information about available GitHub MCP Server toolsets and functionality. Use this to discover what tools are available and understand their purposes.")),
+		mcp.WithString("toolset",
+			mcp.Description(t("TOOL_GET_HELP_TOOLSET_DESCRIPTION", "Optional toolset name to get specific information about. If not provided, returns overview of all toolsets.")),
+		),
+		mcp.WithToolAnnotation(mcp.ToolAnnotation{
+			Title:        t("TOOL_GET_HELP_USER_TITLE", "Get help"),
+			ReadOnlyHint: ToBoolPtr(true),
+		}),
+	)
+
+	type args struct {
+		Toolset string `json:"toolset"`
+	}
+	handler := mcp.NewTypedToolHandler(func(ctx context.Context, _ mcp.CallToolRequest, arguments args) (*mcp.CallToolResult, error) {
+		// Define available toolsets with their descriptions
+		allToolsets := []ToolsetInfo{
+			{
+				Name:        "context",
+				Description: "Tools that provide context about the current user and GitHub context you are operating in",
+				Category:    "User Context",
+			},
+			{
+				Name:        "repos",
+				Description: "GitHub Repository related tools for browsing code, managing files, and repository operations",
+				Category:    "Repository Management",
+			},
+			{
+				Name:        "issues",
+				Description: "GitHub Issues related tools for creating, updating, and managing issues",
+				Category:    "Issue Management",
+			},
+			{
+				Name:        "pull_requests",
+				Description: "GitHub Pull Request related tools for managing PRs, reviews, and code changes",
+				Category:    "Pull Request Management",
+			},
+			{
+				Name:        "actions",
+				Description: "GitHub Actions workflows and CI/CD operations",
+				Category:    "CI/CD & Automation",
+			},
+			{
+				Name:        "code_security",
+				Description: "Code security related tools, such as GitHub Code Scanning",
+				Category:    "Security & Compliance",
+			},
+			{
+				Name:        "secret_protection",
+				Description: "Secret scanning and protection tools",
+				Category:    "Security & Compliance",
+			},
+			{
+				Name:        "dependabot",
+				Description: "Dependabot alerts and dependency management tools",
+				Category:    "Security & Compliance",
+			},
+			{
+				Name:        "users",
+				Description: "GitHub User related tools for searching and managing users",
+				Category:    "User Management",
+			},
+			{
+				Name:        "orgs",
+				Description: "GitHub Organization related tools",
+				Category:    "Organization Management",
+			},
+			{
+				Name:        "discussions",
+				Description: "GitHub Discussions related tools",
+				Category:    "Community & Collaboration",
+			},
+			{
+				Name:        "gists",
+				Description: "GitHub Gist related tools for creating and managing code snippets",
+				Category:    "Code Sharing",
+			},
+			{
+				Name:        "notifications",
+				Description: "GitHub notification management tools",
+				Category:    "Communication",
+			},
+		}
+
+		// If a specific toolset is requested, filter to just that one
+		if arguments.Toolset != "" {
+			for _, toolset := range allToolsets {
+				if toolset.Name == arguments.Toolset {
+					helpInfo := HelpInfo{
+						ServerDescription: "GitHub MCP Server provides AI tools direct access to GitHub's platform for repository management, issue tracking, CI/CD automation, and more.",
+						Toolsets:          []ToolsetInfo{toolset},
+						Usage:             "Use the tools within this toolset to interact with GitHub. Each tool has specific parameters and functionality described in its individual documentation.",
+					}
+					return MarshalledTextResult(helpInfo), nil
+				}
+			}
+			// If toolset not found, return error
+			return mcp.NewToolResultError("Toolset '" + arguments.Toolset + "' not found. Use get_help without parameters to see all available toolsets."), nil
+		}
+
+		// Return information about all toolsets
+		helpInfo := HelpInfo{
+			ServerDescription: "GitHub MCP Server connects AI tools directly to GitHub's platform. This gives AI agents, assistants, and chatbots the ability to read repositories and code files, manage issues and PRs, analyze code, and automate workflows through natural language interactions.",
+			Toolsets:          allToolsets,
+			Usage:             "To use these tools, specify the toolset names when starting the server with --toolsets parameter, or use 'all' to enable everything. Each toolset contains multiple specialized tools for different GitHub operations.",
+		}
+
+		return MarshalledTextResult(helpInfo), nil
+	})
+
+	return tool, handler
+}

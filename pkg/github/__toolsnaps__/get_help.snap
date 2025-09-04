@@ -1,0 +1,17 @@
+{
+  "annotations": {
+    "title": "Get help",
+    "readOnlyHint": true
+  },
+  "description": "Get help information about available GitHub MCP Server toolsets and functionality. Use this to discover what tools are available and understand their purposes.",
+  "inputSchema": {
+    "properties": {
+      "toolset": {
+        "description": "Optional toolset name to get specific information about. If not provided, returns overview of all toolsets.",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "name": "get_help"
+}
